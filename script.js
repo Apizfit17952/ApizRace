@@ -205,7 +205,7 @@ function updateEnhancedLeaderboard() {
   }
 
   const searchQuery = document.getElementById("searchLeaderboard")?.value.trim().toLowerCase() || "";
-  tableBody.innerHTML = "";
+  // Only clear tableBody after sorting/filtering to minimize reflow
   leaderboard = [];
 
   const now = new Date().getTime();
@@ -298,34 +298,32 @@ function updateEnhancedLeaderboard() {
     runner.furthestTimestamp = furthestTimestamp;
   });
   // 2. Find the maximum furthest checkpoint index among all runners
-  const maxCheckpointIndex = Math.max(...allRunners.map(r => r.furthestIndex));
   // 3. Sort: furthest checkpoint index (descending), then earliest timestamp (ascending)
+  function getStatusPriority(status) {
+    if (status === 'finished' || status === 'in-progress') return 2;
+    if (status === 'dnf') return 1;
+    if (status === 'dns') return 0;
+    return -1;
+  }
   allRunners.sort((a, b) => {
-    // DNF and DNS always at the bottom
-    const statusOrder = { "dnf": 0, "dns": -1 };
-    if (statusOrder[a.status] !== undefined || statusOrder[b.status] !== undefined) {
-      return (statusOrder[a.status] || 1) - (statusOrder[b.status] || 1);
-    }
-    // 1. Furthest checkpoint index (descending)
+    const aPriority = getStatusPriority(a.status);
+    const bPriority = getStatusPriority(b.status);
+    if (aPriority !== bPriority) return bPriority - aPriority;
     if (b.furthestIndex !== a.furthestIndex) {
       return b.furthestIndex - a.furthestIndex;
     }
-    // 2. For runners at the same checkpoint, by earliest timestamp to that checkpoint (ascending)
     if (a.furthestTimestamp !== null && b.furthestTimestamp !== null) {
       return a.furthestTimestamp - b.furthestTimestamp;
     }
     return 0;
   });
-  // 4. Assign globalRank based on this strict order
   let rank = 1;
   let dnfDnsStartRank = allRunners.length;
-  // First, assign ranks to non-DNF/DNS
   allRunners.forEach(entry => {
     if (entry.status !== 'dnf' && entry.status !== 'dns') {
       entry.globalRank = rank++;
     }
   });
-  // Then, assign ranks to DNF/DNS from the bottom up
   allRunners.forEach(entry => {
     if (entry.status === 'dnf' || entry.status === 'dns') {
       entry.globalRank = dnfDnsStartRank--;
@@ -345,75 +343,83 @@ function updateEnhancedLeaderboard() {
     ) return true;
     return false;
   });
-  const topRunners = filteredRunners.slice(0, 20);
-  if (topRunners.length === 0) {
-    tableBody.innerHTML = `
-      <tr>
+  // Only render the top 50 runners for performance (can adjust as needed)
+  const topRunners = filteredRunners.slice(0, 50);
+
+  // Use document fragment for fast DOM updates
+  requestAnimationFrame(() => {
+    tableBody.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+    if (topRunners.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
         <td colspan="9" class="empty-table">
           <div class="empty-message">
             <i class="fas fa-clipboard-list"></i>
             <p>No runners to display${searchQuery ? ' for "' + searchQuery + '"' : ''}.</p>
           </div>
         </td>
-      </tr>
-    `;
-    return;
-  }
-  topRunners.forEach((entry) => {
-    const row = document.createElement("tr");
-    row.classList.add("fade-in");
-    const globalRank = entry.globalRank;
-    if (globalRank <= 3) {
-      row.classList.add("rank-" + globalRank);
-    }
-    const statusIcon = getStatusIcon(entry.status);
-    let badge = `<span class=\"badge status-badge ${entry.status}\"><i class=\"fas ${statusIcon}\"></i> ${entry.status.toUpperCase()}</span>`;
-    const progressCount = entry.completedCheckpoints.length;
-    const totalConfiguredCheckpoints = checkpoints.length > 0 ? checkpoints.length : 1;
-    const progressPercent = Math.round((progressCount / totalConfiguredCheckpoints) * 100);
-    const progressHTML = `<div class=\"progress-container\"><div class=\"progress-bar\" style=\"width: ${progressPercent}%\"></div><span>${progressPercent}% (${progressCount}/${totalConfiguredCheckpoints})</span></div>`;
+      `;
+      fragment.appendChild(tr);
+    } else {
+      topRunners.forEach((entry) => {
+        const row = document.createElement("tr");
+        row.classList.add("fade-in");
+        const globalRank = entry.globalRank;
+        if (globalRank <= 3) {
+          row.classList.add("rank-" + globalRank);
+        }
+        const statusIcon = getStatusIcon(entry.status);
+        let badge = `<span class=\"badge status-badge ${entry.status}\"><i class=\"fas ${statusIcon}\"></i> ${entry.status.toUpperCase()}</span>`;
+        const progressCount = entry.completedCheckpoints.length;
+        const totalConfiguredCheckpoints = checkpoints.length > 0 ? checkpoints.length : 1;
+        const progressPercent = Math.round((progressCount / totalConfiguredCheckpoints) * 100);
+        const progressHTML = `<div class=\"progress-container\"><div class=\"progress-bar\" style=\"width: ${progressPercent}%\"></div><span>${progressPercent}% (${progressCount}/${totalConfiguredCheckpoints})</span></div>`;
 
-    // Calculate start and end times, and distance
-    let startTime = null, endTime = null, distanceKm = 0;
-    const checkpointsArr = entry.data || [];
-    const startEntry = checkpointsArr.find(e => e.checkpoint === "Start");
-    if (startEntry) startTime = startEntry.timestamp;
-    if (entry.status === "finished") {
-      const finishEntry = checkpointsArr.find(e => e.checkpoint === "Finish");
-      if (finishEntry) endTime = finishEntry.timestamp;
-      distanceKm = RACE_DISTANCE_KM;
-    } else if (entry.lastCheckpoint && entry.lastCheckpoint !== "None" && startEntry) {
-      endTime = entry.lastTimestamp;
-      const lastCpIndex = checkpoints.indexOf(entry.lastCheckpoint);
-      if (lastCpIndex > 0 && checkpoints.length > 1) {
-        distanceKm = (lastCpIndex / (checkpoints.length - 1)) * RACE_DISTANCE_KM;
-      }
+        // Calculate start and end times, and distance
+        let startTime = null, endTime = null, distanceKm = 0;
+        const checkpointsArr = entry.data || [];
+        const startEntry = checkpointsArr.find(e => e.checkpoint === "Start");
+        if (startEntry) startTime = startEntry.timestamp;
+        if (entry.status === "finished") {
+          const finishEntry = checkpointsArr.find(e => e.checkpoint === "Finish");
+          if (finishEntry) endTime = finishEntry.timestamp;
+          distanceKm = RACE_DISTANCE_KM;
+        } else if (entry.lastCheckpoint && entry.lastCheckpoint !== "None" && startEntry) {
+          endTime = entry.lastTimestamp;
+          const lastCpIndex = checkpoints.indexOf(entry.lastCheckpoint);
+          if (lastCpIndex > 0 && checkpoints.length > 1) {
+            distanceKm = (lastCpIndex / (checkpoints.length - 1)) * RACE_DISTANCE_KM;
+          }
+        }
+        let totalTime = (startTime && endTime && endTime > startTime) ? (endTime - startTime) : null;
+        let pace = (totalTime && distanceKm > 0) ? totalTime / distanceKm : null;
+        let paceFormatted = (pace && distanceKm > 0) ? formatPace(pace, distanceKm) : "N/A";
+        let totalTimeFormatted = (totalTime && totalTime > 0) ? formatTime(totalTime) : "N/A";
+        let lastTime = entry.lastTimestamp ? formatTimestamp(entry.lastTimestamp) : "N/A";
+        let rankDisplay = `${globalRank}`;
+        const medalColors = ["gold", "silver", "#cd7f32"];
+        const trophyColors = ["silver", "#cd7f32"];
+        if (globalRank <= 3) {
+          rankDisplay = `<i class='fas fa-medal' style='color: ${medalColors[globalRank-1]}; font-size: 0.9rem; margin-right: 4px;'></i> ${globalRank}`;
+        } else if (globalRank <= 5) {
+          rankDisplay = `<i class='fas fa-trophy' style='color: ${trophyColors[globalRank-4]}; font-size: 0.9rem; margin-right: 4px;'></i> ${globalRank}`;
+        }
+        row.innerHTML = `
+          <td>${rankDisplay}</td>
+          <td>${entry.runner}</td>
+          <td>${entry.name}</td>
+          <td>${paceFormatted}</td>
+          <td>${badge}</td>
+          <td>${progressHTML}</td>
+          <td>${entry.lastCheckpoint}</td>
+          <td>${totalTimeFormatted}</td>
+          <td>${lastTime}</td>
+        `;
+        fragment.appendChild(row);
+      });
     }
-    let totalTime = (startTime && endTime && endTime > startTime) ? (endTime - startTime) : null;
-    let pace = (totalTime && distanceKm > 0) ? totalTime / distanceKm : null;
-    let paceFormatted = (pace && distanceKm > 0) ? formatPace(pace, distanceKm) : "N/A";
-    let totalTimeFormatted = (totalTime && totalTime > 0) ? formatTime(totalTime) : "N/A";
-    let lastTime = entry.lastTimestamp ? formatTimestamp(entry.lastTimestamp) : "N/A";
-    let rankDisplay = `${globalRank}`;
-    const medalColors = ["gold", "silver", "#cd7f32"];
-    const trophyColors = ["silver", "#cd7f32"];
-    if (globalRank <= 3) {
-      rankDisplay = `<i class='fas fa-medal' style='color: ${medalColors[globalRank-1]}; font-size: 0.9rem; margin-right: 4px;'></i> ${globalRank}`;
-    } else if (globalRank <= 5) {
-      rankDisplay = `<i class='fas fa-trophy' style='color: ${trophyColors[globalRank-4]}; font-size: 0.9rem; margin-right: 4px;'></i> ${globalRank}`;
-    }
-    row.innerHTML = `
-      <td>${rankDisplay}</td>
-      <td>${entry.runner}</td>
-      <td>${entry.name}</td>
-      <td>${paceFormatted}</td>
-      <td>${badge}</td>
-      <td>${progressHTML}</td>
-      <td>${entry.lastCheckpoint}</td>
-      <td>${totalTimeFormatted}</td>
-      <td>${lastTime}</td>
-    `;
-    tableBody.appendChild(row);
+    tableBody.appendChild(fragment);
   });
 }
 
