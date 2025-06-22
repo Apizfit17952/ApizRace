@@ -1,0 +1,14 @@
+{
+  "name": "race-tracker",
+  "version": "1.0.0",
+  "description": "Real-time race tracker with leaderboard, user management, and appearance sync.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.5",
+    "cors": "^2.8.5"
+  }
+} 

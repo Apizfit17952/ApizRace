@@ -1,0 +1,5 @@
+Local test server.
+
+Run in CMD server.js in directory.
+
+node server.js

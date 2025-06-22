@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Tracker - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="auth-container" class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <h1><i class="fas fa-running"></i> Race Tracker</h1>
+                    <p>Race management system for event administrators</p>
+                </div>
+                <div class="auth-form">
+                    <div class="form-group" id="username-group">
+                        <label for="username">Username</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-user input-icon"></i>
+                            <input type="text" id="username" placeholder="Enter username" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="admin-password">Admin Password</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="admin-password" placeholder="Enter admin password" autocomplete="off">
+                        </div>
+                    </div>
+                    <button id="login-button" class="btn btn-primary btn-block" onclick="authenticate()">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    <div class="auth-footer">
+                        <div class="theme-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="theme-toggle-checkbox">
+                                <span class="slider round"></span>
+                            </label>
+                            <i class="fas fa-moon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="main-content" class="main-content">
+            <nav class="navbar">
+                <div class="navbar-brand">
+                    <i class="fas fa-running"></i> Race Tracker
+                </div>
+                <button class="navbar-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="navbarNav">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="navbar-nav" id="navbarNav">
+                    <li><a href="index.html" class="active"><i class="fas fa-home"></i> Home</a></li>
+                    <li><a href="leaderboard.html"><i class="fas fa-list-ol"></i> Leaderboard</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                    <li><a href="#" id="logout-button" onclick="logoutAdmin()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </nav>
+
+            <div class="content-area">
+                <div class="dashboard-grid">
+                    <div class="grid-column">
+                        <div class="card wide-card welcome-card">
+                            <div class="banner">
+                                <div class="banner-content">
+                                    <h1>Welcome, Admin!</h1>
+                                    <p>Manage your race event efficiently.</p>
+                                    <h2 id="bannerRaceEventName"></h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-user-check"></i> Runner Check-in</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="runnerId">Runner ID</label>
+                                    <div class="input-with-icon">
+                                        <i class="fas fa-id-card input-icon"></i>
+                                        <input type="text" id="runnerId" placeholder="Enter Runner ID" list="runnerIdList" autocomplete="off">
+                                    </div>
+                                    <datalist id="runnerIdList"></datalist>
+                                </div>
+                                <button id="log-checkpoint-button" class="btn btn-primary btn-block" onclick="logCheckpoint()">
+                                    <i class="fas fa-clipboard-check"></i> Log Checkpoint
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-info-circle"></i> Runner Status</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="statusRunnerId">Runner ID</label>
+                                    <div class="input-with-icon">
+                                        <i class="fas fa-user-tag input-icon"></i>
+                                        <input type="text" id="statusRunnerId" placeholder="Enter Runner ID" list="runnerIdList" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="button-group">
+                                    <button id="mark-dns-button" class="btn btn-warning" onclick="markRunnerDNS()">
+                                        <i class="fas fa-ban"></i> Mark DNS
+                                    </button>
+                                    <button id="mark-dnf-button" class="btn btn-danger" onclick="markRunnerDNF()">
+                                        <i class="fas fa-times-circle"></i> Mark DNF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid-column">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-stopwatch"></i> Race Control</h2>
+                            </div>
+                            <div class="card-body">
+                                <button id="flag-off-button" class="btn btn-success btn-block" onclick="flagOffRace()">
+                                    <i class="fas fa-flag"></i> Flag Off Race
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card wide-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-history"></i> Recent Activity</h2>
+                            </div>
+                            <div class="card-body scrollable-content">
+                                <ul id="checkpointLog" class="log-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toggleBtn = document.querySelector('.navbar-toggle');
+      const nav = document.getElementById('navbarNav');
+      if (toggleBtn && nav) {
+        toggleBtn.addEventListener('click', function() {
+          nav.classList.toggle('open');
+          const expanded = nav.classList.contains('open');
+          toggleBtn.setAttribute('aria-expanded', expanded);
+        });
+      }
+    });
+    </script>
+    <footer class="site-footer">
+        <div class="footer-content">
+            Copyright: ApizFit6007 2025
+        </div>
+    </footer>
+</body>
+</html>

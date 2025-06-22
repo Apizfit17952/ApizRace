@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Tracker - Leaderboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="main-content" class="main-content">
+            <nav class="navbar">
+                <div class="navbar-brand">
+                    <i class="fas fa-running"></i> Race Tracker
+                </div>
+                <button class="navbar-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="navbarNav">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="navbar-nav" id="navbarNav">
+                    <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+                    <li><a href="leaderboard.html" class="active"><i class="fas fa-list-ol"></i> Leaderboard</a></li>
+                    <li><a href="settings.html"><i class="fas fa-cog"></i> Settings</a></li>
+                    <li><a href="#" id="logout-button" onclick="logoutAdmin()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </nav>
+
+            <div class="content-area">
+                <div class="card wide-card welcome-card leaderboard-banner-card">
+                    <div class="banner" id="leaderboardBanner">
+                        <div class="banner-content">
+                            <h2 id="leaderboardBannerRaceEventName"></h2>
+                            <h1><i class="fas fa-list-ol"></i> Live Race Leaderboard</h1>
+                            <p>Track the progress of all participants in real-time.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="grid-column wide-column">
+                        <div class="card wide-card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-list-ol"></i> Race Leaderboard</h2>
+                                <h3 id="leaderboardRaceEventName" class="race-event-title"></h3>
+                                <div class="search-container">
+                                    <input type="text" id="searchLeaderboard" placeholder="Search Runner ID, Name, DNF, or DNS..." oninput="updateEnhancedLeaderboard()">
+                                </div>
+                            </div>
+                            <div class="card-body scrollable-content">
+                                <table id="leaderboardTable" class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>Average Pace</th>
+                                            <th>Status</th>
+                                            <th>Progress</th>
+                                            <th>Checkpoint</th>
+                                            <th>Total Time</th>
+                                            <th>Last Update</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="leaderboard">
+                                        </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-primary" onclick="updateEnhancedLeaderboard()">
+                                    <i class="fas fa-sync-alt"></i> Refresh Leaderboard
+                                </button>
+                                <button class="btn btn-secondary" onclick="exportToCSV()">
+                                    <i class="fas fa-file-export"></i> Export to CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toggleBtn = document.querySelector('.navbar-toggle');
+      const nav = document.getElementById('navbarNav');
+      if (toggleBtn && nav) {
+        toggleBtn.addEventListener('click', function() {
+          nav.classList.toggle('open');
+          const expanded = nav.classList.contains('open');
+          toggleBtn.setAttribute('aria-expanded', expanded);
+        });
+      }
+    });
+    </script>
+    <footer class="site-footer">
+        <div class="footer-content">
+            Copyright: ApizFit6007 2025
+        </div>
+    </footer>
+</body>
+</html>
