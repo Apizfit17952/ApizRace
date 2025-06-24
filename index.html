@@ -153,7 +153,7 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="script.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
+    <script src="https://unpkg.com/@zxing/browser@latest"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.querySelector('.navbar-toggle');
@@ -182,12 +182,16 @@
           overlay.style.display = 'flex';
           msg.textContent = 'Initializing camera...';
           try {
+            if (!window.ZXingBrowser || !window.ZXingBrowser.BrowserPDF417CodeReader) {
+              msg.textContent = 'Scanner library failed to load. Please refresh the page.';
+              return;
+            }
             if (!codeReader) {
-              codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+              codeReader = new window.ZXingBrowser.BrowserPDF417CodeReader();
             }
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
-            msg.textContent = 'Point camera at PDF417 code...';
+            msg.textContent = 'Point your camera at the runner\'s PDF417 code.';
             codeReader.decodeFromVideoElement(video, (result, err) => {
               if (result) {
                 msg.textContent = 'Scanned: ' + result.text;
@@ -200,12 +204,21 @@
                   // Automatically log checkpoint
                   if (typeof logCheckpoint === 'function') logCheckpoint();
                 }, 800);
-              } else if (err && !(err instanceof ZXingBrowser.NotFoundException)) {
+              } else if (err && !(err instanceof window.ZXingBrowser.NotFoundException)) {
+                msg.textContent = 'Camera error: ' + err;
+              } else if (!result) {
                 msg.textContent = 'Scanning...';
               }
-            }, ZXingBrowser.BarcodeFormat.PDF_417);
+            });
           } catch (e) {
-            msg.textContent = 'Camera error: ' + e;
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+              msg.textContent = 'Camera access denied. Please allow camera access to scan.';
+            } else if (e.name === 'NotFoundError') {
+              msg.textContent = 'No camera found on this device.';
+            } else {
+              msg.textContent = 'Camera error: ' + e;
+            }
+            overlay.style.display = 'flex';
           }
         });
         closeBtn.addEventListener('click', function() {
