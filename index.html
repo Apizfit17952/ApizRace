@@ -82,12 +82,13 @@
                             <div class="card-body">
                                 <div class="form-group">
                                     <label for="runnerId">Runner ID</label>
-                                    <div class="input-with-icon">
+                                    <div class="input-with-icon" style="position:relative;">
                                         <i class="fas fa-id-card input-icon"></i>
                                         <input type="text" id="runnerId" placeholder="Enter Runner ID" list="runnerIdList" autocomplete="off">
+                                        <button id="scan-pdf417-btn" type="button" title="Scan PDF417" style="position:absolute; right:5px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.3em; color:#6366f1; z-index:2;"><i class="fas fa-camera"></i></button>
                                     </div>
-                                    <datalist id="runnerIdList"></datalist>
                                 </div>
+                                <datalist id="runnerIdList"></datalist>
                                 <button id="log-checkpoint-button" class="btn btn-primary btn-block" onclick="logCheckpoint()">
                                     <i class="fas fa-clipboard-check"></i> Log Checkpoint
                                 </button>
@@ -144,8 +145,15 @@
         </div>
     </div>
 
+    <div id="pdf417-scanner-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+        <video id="pdf417-video" autoplay playsinline style="max-width:90vw; max-height:60vh; border:4px solid #fff; border-radius:10px;"></video>
+        <button id="close-pdf417-scanner" style="margin-top:20px; padding:10px 20px; font-size:1.1em; background:#ef4444; color:#fff; border:none; border-radius:6px; cursor:pointer;">Close Scanner</button>
+        <div id="pdf417-scanner-msg" style="color:#fff; margin-top:10px;"></div>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.querySelector('.navbar-toggle');
@@ -158,6 +166,56 @@
         });
       }
     });
+
+    // PDF417 Scanner logic
+    (function() {
+      const scanBtn = document.getElementById('scan-pdf417-btn');
+      const overlay = document.getElementById('pdf417-scanner-overlay');
+      const video = document.getElementById('pdf417-video');
+      const closeBtn = document.getElementById('close-pdf417-scanner');
+      const msg = document.getElementById('pdf417-scanner-msg');
+      let codeReader = null;
+      let stream = null;
+
+      if (scanBtn && overlay && video && closeBtn) {
+        scanBtn.addEventListener('click', async function() {
+          overlay.style.display = 'flex';
+          msg.textContent = 'Initializing camera...';
+          try {
+            if (!codeReader) {
+              codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+            }
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+            msg.textContent = 'Point camera at PDF417 code...';
+            codeReader.decodeFromVideoElement(video, (result, err) => {
+              if (result) {
+                msg.textContent = 'Scanned: ' + result.text;
+                document.getElementById('runnerId').value = result.text;
+                setTimeout(() => {
+                  overlay.style.display = 'none';
+                  codeReader.reset();
+                  if (stream) { stream.getTracks().forEach(track => track.stop()); }
+                  msg.textContent = '';
+                  // Automatically log checkpoint
+                  if (typeof logCheckpoint === 'function') logCheckpoint();
+                }, 800);
+              } else if (err && !(err instanceof ZXingBrowser.NotFoundException)) {
+                msg.textContent = 'Scanning...';
+              }
+            }, ZXingBrowser.BarcodeFormat.PDF_417);
+          } catch (e) {
+            msg.textContent = 'Camera error: ' + e;
+          }
+        });
+        closeBtn.addEventListener('click', function() {
+          overlay.style.display = 'none';
+          if (codeReader) codeReader.reset();
+          if (stream) { stream.getTracks().forEach(track => track.stop()); }
+          msg.textContent = '';
+        });
+      }
+    })();
     </script>
     <footer class="site-footer">
         <div class="footer-content">
