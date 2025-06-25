@@ -153,7 +153,7 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="script.js"></script>
-    <script src="https://unpkg.com/@zxing/browser@latest"></script>
+    <script src="https://unpkg.com/@zxing/browser@0.1.0"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.querySelector('.navbar-toggle');
@@ -182,12 +182,12 @@
           overlay.style.display = 'flex';
           msg.textContent = 'Initializing camera...';
           try {
-            if (!window.ZXingBrowser || !window.ZXingBrowser.BrowserPDF417CodeReader) {
+            if (!window.ZXing || !window.ZXing.BrowserPDF417CodeReader) {
               msg.textContent = 'Scanner library failed to load. Please refresh the page.';
               return;
             }
             if (!codeReader) {
-              codeReader = new window.ZXingBrowser.BrowserPDF417CodeReader();
+              codeReader = new window.ZXing.BrowserPDF417CodeReader();
             }
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
@@ -204,7 +204,7 @@
                   // Automatically log checkpoint
                   if (typeof logCheckpoint === 'function') logCheckpoint();
                 }, 800);
-              } else if (err && !(err instanceof window.ZXingBrowser.NotFoundException)) {
+              } else if (err && !(err instanceof window.ZXing.NotFoundException)) {
                 msg.textContent = 'Camera error: ' + err;
               } else if (!result) {
                 msg.textContent = 'Scanning...';
