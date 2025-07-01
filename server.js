@@ -83,6 +83,16 @@ io.on('connection', (socket) => {
   socket.on('updateCheckpointData', (data) => {
     checkpointData = data;
     io.emit('checkpointDataUpdated', checkpointData);
+    // Emit a fresh allData snapshot to all clients
+    io.emit('allData', {
+      leaderboard,
+      users,
+      appearance,
+      raceEventName,
+      checkpoints,
+      checkpointData,
+      recentActivity
+    });
   });
 
   // Recent activity logs

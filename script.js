@@ -811,6 +811,17 @@ function logCheckpoint() {
     return; 
   }
   let nextCheckpoint = checkpoints[nextCheckpointIndex];
+  // Prevent double logging of the same checkpoint within 1 minute
+  if (existingCheckpoints.length > 0) {
+    const lastEntry = existingCheckpoints[existingCheckpoints.length - 1];
+    if (
+      lastEntry.checkpoint === nextCheckpoint &&
+      timestamp - lastEntry.timestamp < 60000 // 60,000 ms = 1 minute
+    ) {
+      showNotification(`Checkpoint '${nextCheckpoint}' for Runner ${runnerId} was already logged less than 1 minute ago. Please wait before logging again.`, "warning");
+      return;
+    }
+  }
   checkpointData[runnerId].checkpoints.push({
     checkpoint: nextCheckpoint,
     timestamp
