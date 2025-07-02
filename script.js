@@ -1769,7 +1769,8 @@ function registerUser() {
         showNotification("Username already exists", "error");
         return;
     }
-    const user = { id: Date.now(), username, password };
+    // Always assign a unique id
+    const user = { id: Date.now().toString() + Math.floor(Math.random()*1000).toString(), username, password };
     users.push(user);
     socket.emit('addUser', user);
     showNotification(`User ${username} registered`, "success");
@@ -1802,7 +1803,8 @@ function registerUserFromSettings() {
         showNotification("Username already exists", "error");
         return;
     }
-    const user = { id: Date.now(), username, password };
+    // Always assign a unique id
+    const user = { id: Date.now().toString() + Math.floor(Math.random()*1000).toString(), username, password };
     users.push(user);
     socket.emit('addUser', user);
     showNotification(`User ${username} registered`, "success");
@@ -1824,6 +1826,7 @@ function showRegistrationCardSettingsIfAdmin() {
 }
 
 function removeUser(userId) {
+    console.log('removeUser called with userId:', userId);
     if (!isAuthenticated) {
         showNotification("Admin access required", "error");
         return;

@@ -4,6 +4,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const session = require('express-session');
+const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
+require('dotenv').config();
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +22,30 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'race_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
+
+// Load admin config
+const ADMIN_CONFIG_PATH = path.join(__dirname, 'admin.config.json');
+function loadAdminConfig() {
+  if (!fs.existsSync(ADMIN_CONFIG_PATH)) {
+    // Default config: password is 'admin123' (hashed)
+    const defaultHash = bcrypt.hashSync('admin123', 10);
+    fs.writeFileSync(ADMIN_CONFIG_PATH, JSON.stringify({
+      email: process.env.ADMIN_EMAIL || 'hafizhashim17952@gmail.com',
+      passwordHash: defaultHash
+    }, null, 2));
+  }
+  return JSON.parse(fs.readFileSync(ADMIN_CONFIG_PATH));
+}
+function saveAdminConfig(config) {
+  fs.writeFileSync(ADMIN_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+let adminConfig = loadAdminConfig();
 
 // In-memory data stores (replace with DB for production)
 let leaderboard = [];
@@ -59,6 +88,7 @@ io.on('connection', (socket) => {
     io.emit('usersUpdated', users);
   });
   socket.on('removeUser', (userId) => {
+    console.log('Server received removeUser for id:', userId);
     users = users.filter(u => u.id !== userId);
     io.emit('usersUpdated', users);
   });
@@ -122,6 +152,77 @@ io.on('connection', (socket) => {
     });
   });
 });
+
+// --- AUTH ROUTES ---
+app.post('/api/login', async (req, res) => {
+  const { password } = req.body;
+  adminConfig = loadAdminConfig();
+  const match = await bcrypt.compare(password, adminConfig.passwordHash);
+  if (match) {
+    req.session.isAdmin = true;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid password' });
+  }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+// --- PASSWORD RESET ---
+const resetTokens = {};
+app.post('/api/request-reset', (req, res) => {
+  const { email } = req.body;
+  adminConfig = loadAdminConfig();
+  if (email !== adminConfig.email) {
+    return res.status(400).json({ success: false, message: 'Email not found' });
+  }
+  const token = Math.random().toString(36).substr(2) + Date.now();
+  resetTokens[token] = { email, expires: Date.now() + 1000 * 60 * 15 }; // 15 min
+  // Send email
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.hafizhashim17952@gmail.com,
+      pass: process.env.411522630
+    }
+  });
+  const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${token}`;
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Race Admin Password Reset',
+    text: `Reset your password: ${resetUrl}`
+  };
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Failed to send email' });
+    }
+    res.json({ success: true });
+  });
+});
+
+app.post('/api/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  const entry = resetTokens[token];
+  if (!entry || entry.expires < Date.now()) {
+    return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+  }
+  adminConfig = loadAdminConfig();
+  adminConfig.passwordHash = await bcrypt.hash(password, 10);
+  saveAdminConfig(adminConfig);
+  delete resetTokens[token];
+  res.json({ success: true });
+});
+
+// --- PROTECT ADMIN ROUTES ---
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.isAdmin) return next();
+  res.status(401).json({ success: false, message: 'Unauthorized' });
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
