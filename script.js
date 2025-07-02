@@ -136,14 +136,12 @@ function debounce(func, wait) {
 // Format time in milliseconds to HH:MM:SS.mmm
 function formatTime(ms) {
   if (!ms && ms !== 0) return "N/A";
-
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const milliseconds = ms % 1000;
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(milliseconds).padStart(3, '0')}`;
 }
 
 // Format timestamp to local time
@@ -1134,6 +1132,15 @@ function resetData() {
   }
 }
 
+function formatTime12H(ms, timeZone = 'Asia/Kuala_Lumpur') {
+  if (!ms && ms !== 0) return "N/A";
+  const date = new Date(ms);
+  const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone };
+  const timeString = date.toLocaleTimeString('en-US', options);
+  const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+  return `${timeString}:${milliseconds}`;
+}
+
 function exportToCSV() {
   // Use the in-memory checkpointData (synced with server)
   if (!checkpointData || Object.keys(checkpointData).length === 0) {
@@ -1172,13 +1179,20 @@ function exportToCSV() {
       }
     }
     let totalTime = (startTime && endTime && endTime > startTime) ? (endTime - startTime) : null;
-    let pace = (totalTime && distanceKm > 0) ? totalTime / distanceKm : null;
+    // Pace per loop (not per km)
+    let pace = (totalTime && checkpoints.length > 1) ? totalTime / (checkpoints.length - 1) : null;
 
     // Calculate split times only (no cumulative)
     let splitTimes = [];
     let prevTimestamp = startTime;
     for (let i = 0; i < checkpoints.length; i++) {
       const cpName = checkpoints[i];
+      if (i === 0) {
+        // For Start checkpoint, use flagOffTime as split time
+        splitTimes.push(flagOffTime ? flagOffTime : (startTime || "N/A"));
+        prevTimestamp = startTime;
+        continue;
+      }
       const cpEntry = data.find(e => e.checkpoint === cpName);
       if (cpEntry && prevTimestamp && cpEntry.timestamp > prevTimestamp) {
         let split = cpEntry.timestamp - prevTimestamp;
@@ -1261,7 +1275,7 @@ function exportToCSV() {
   });
 
   // CSV header (no cumulative columns)
-  let csvContent = "Rank,Runner ID,Runner Name,Average Pace,Status,Progress (%),Last Checkpoint,Total Time,Last Update Timestamp";
+  let csvContent = "Rank,Runner ID,Runner Name,Average Pace (min/Loop),Status,Progress (%),Last Checkpoint,Total Time,Last Update Timestamp";
   checkpoints.forEach((cp, idx) => {
     csvContent += `,Split: ${cp}`;
   });
@@ -1271,18 +1285,26 @@ function exportToCSV() {
     const rank = idx + 1;
     const runnerId = (entry.runner || "").toString().replace(/"/g, '""');
     const name = (entry.name || "").toString().replace(/"/g, '""');
-    const paceFormatted = entry.pace && entry.pace > 0 ? formatPace(entry.pace, RACE_DISTANCE_KM) : "N/A";
+    // Pace in min/Loop
+    const paceFormatted = entry.pace && entry.pace > 0 ? (entry.pace / 60000).toFixed(2) : "N/A";
     const status = (entry.status || "").toUpperCase();
     const progressCount = (entry.completedCheckpoints || []).length;
     const totalConfiguredCheckpoints = checkpoints.length > 0 ? checkpoints.length : 1;
     const progressPercent = Math.round((progressCount / totalConfiguredCheckpoints) * 100);
     const lastCheckpoint = (entry.lastCheckpoint || "").toString().replace(/"/g, '""');
+    // Format total time as HH:MM:SS:MS
     const totalTimeFormatted = entry.totalTime && entry.totalTime > 0 ? formatTime(entry.totalTime) : "N/A";
-    const lastUpdateFormatted = entry.lastTimestamp ? new Date(entry.lastTimestamp).toISOString() : "N/A";
+    // Format last update as 12-hour Kuala Lumpur time with ms
+    const lastUpdateFormatted = entry.lastTimestamp ? formatTime12H(entry.lastTimestamp) : "N/A";
     let row = `${rank},"${runnerId}","${name}","${paceFormatted}","${status}",${progressPercent},"${lastCheckpoint}","${totalTimeFormatted}","${lastUpdateFormatted}"`;
     // Add split columns only
     for (let i = 0; i < checkpoints.length; i++) {
-      row += "," + (entry.splitTimes[i] !== null && entry.splitTimes[i] !== undefined ? formatTime(entry.splitTimes[i]) : "N/A");
+      if (i === 0) {
+        // For Split: Start, always use 00:00:00:000
+        row += ',00:00:00:000';
+      } else {
+        row += "," + (entry.splitTimes[i] !== null && entry.splitTimes[i] !== undefined ? formatTime(entry.splitTimes[i]) : "N/A");
+      }
     }
     csvContent += row + "\n";
   });
