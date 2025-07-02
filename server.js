@@ -186,8 +186,8 @@ app.post('/api/request-reset', (req, res) => {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.hafizhashim17952@gmail.com,
-      pass: process.env.411522630
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
   });
   const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${token}`;
