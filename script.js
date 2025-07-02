@@ -29,11 +29,34 @@ socket.on('allData', data => {
   recentActivity = data.recentActivity || [];
   // Call UI update functions here as needed
   updateAllUI();
+  // Auto-logout if current user is removed (after reset all data)
+  const session = getUserSession();
+  if (session && session.type === 'user') {
+    const stillExists = users.some(u => u.username === session.username && u.id);
+    if (!stillExists) {
+      clearUserSession();
+      showNotification('Your account has been removed. Logging out...', 'error');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+    }
+  }
 });
 
 // Listen for real-time updates
 socket.on('leaderboardUpdated', data => { leaderboard = data; updateEnhancedLeaderboard(); });
-socket.on('usersUpdated', data => { users = data; displayUserList && displayUserList(); });
+socket.on('usersUpdated', data => {
+  users = data;
+  displayUserList && displayUserList();
+  // Auto-logout if current user is removed
+  const session = getUserSession();
+  if (session && session.type === 'user') {
+    const stillExists = users.some(u => u.username === session.username && u.id);
+    if (!stillExists) {
+      clearUserSession();
+      showNotification('Your account has been removed. Logging out...', 'error');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+    }
+  }
+});
 socket.on('appearanceUpdated', data => { appearance = data; applyImages && applyImages(); });
 socket.on('raceEventNameUpdated', data => { raceEventName = data; displayRaceEventName && displayRaceEventName(); updateWelcomeBanner && updateWelcomeBanner(); });
 socket.on('checkpointsUpdated', data => { checkpoints = data; displayCheckpointList && displayCheckpointList(); });
@@ -1800,14 +1823,14 @@ function showRegistrationCardSettingsIfAdmin() {
     }
 }
 
-function removeUser(username) {
+function removeUser(userId) {
     if (!isAuthenticated) {
         showNotification("Admin access required", "error");
         return;
     }
-    users = users.filter(u => u.username !== username);
-    socket.emit('removeUser', username);
-    showNotification(`User ${username} removed`, "success");
+    users = users.filter(u => u.id !== userId);
+    socket.emit('removeUser', userId);
+    showNotification(`User removed`, "success");
     displayUserList();
 }
 
@@ -1828,7 +1851,7 @@ function displayUserList() {
             <div class="log-item-content">
                 <div class="log-item-title">${user.username}</div>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="removeUser('${user.username.replace(/'/g, "\\'")}')" title="Remove ${user.username}">
+            <button class="btn btn-danger btn-sm" onclick="removeUser('${user.id}')" title="Remove ${user.username}">
                 <i class="fas fa-trash"></i> Remove
             </button>
         `;
