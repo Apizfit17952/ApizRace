@@ -60,7 +60,20 @@ socket.on('usersUpdated', data => {
 socket.on('appearanceUpdated', data => { appearance = data; applyImages && applyImages(); });
 socket.on('raceEventNameUpdated', data => { raceEventName = data; displayRaceEventName && displayRaceEventName(); updateWelcomeBanner && updateWelcomeBanner(); });
 socket.on('checkpointsUpdated', data => { checkpoints = data; displayCheckpointList && displayCheckpointList(); });
-socket.on('checkpointDataUpdated', data => { checkpointData = data; updateEnhancedLeaderboard && updateEnhancedLeaderboard(); displayCheckpointLog && displayCheckpointLog(); });
+socket.on('checkpointDataUpdated', (data) => {
+  if (data.type === 'incremental') {
+    // Handle incremental updates more efficiently
+    checkpointData = data.changes;
+    // Use debounced update instead of immediate to reduce lag
+    debouncedLeaderboardUpdate();
+    debouncedCheckpointLogUpdate();
+  } else {
+    // Fallback for backward compatibility
+    checkpointData = data;
+    updateEnhancedLeaderboard && updateEnhancedLeaderboard();
+    displayCheckpointLog && displayCheckpointLog();
+  }
+});
 socket.on('recentActivityUpdated', data => { recentActivity = data; displayCheckpointLog && displayCheckpointLog(); });
 
 function updateAllUI() {
@@ -132,6 +145,10 @@ function debounce(func, wait) {
     timeout = setTimeout(later, wait);
   };
 }
+
+// Debounced updates for better performance
+const debouncedLeaderboardUpdate = debounce(updateEnhancedLeaderboard, 1000);
+const debouncedCheckpointLogUpdate = debounce(displayCheckpointLog, 1000);
 
 // Format time in milliseconds to HH:MM:SS.mmm
 function formatTime(ms) {
@@ -364,8 +381,10 @@ function updateEnhancedLeaderboard() {
     ) return true;
     return false;
   });
-  // Only render the top 50 runners for performance (can adjust as needed)
-  const topRunners = filteredRunners.slice(0, 50);
+  
+  // PERFORMANCE OPTIMIZATION: Only render the top 50 runners for performance
+  const ITEMS_PER_PAGE = 50;
+  const topRunners = filteredRunners.slice(0, ITEMS_PER_PAGE);
 
   // Use document fragment for fast DOM updates
   requestAnimationFrame(() => {

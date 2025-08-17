@@ -7,6 +7,8 @@ const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const fs = require('fs');
 
@@ -16,9 +18,16 @@ const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
-  }
+  },
+  // Add these optimizations
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
 
+// Add compression before other middleware
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
@@ -28,6 +37,14 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false } // Set to true if using HTTPS
 }));
+
+// Add rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use('/api/', limiter);
 
 // Load admin config
 const ADMIN_CONFIG_PATH = path.join(__dirname, 'admin.config.json');
@@ -112,17 +129,16 @@ io.on('connection', (socket) => {
   });
   socket.on('updateCheckpointData', (data) => {
     checkpointData = data;
-    io.emit('checkpointDataUpdated', checkpointData);
-    // Emit a fresh allData snapshot to all clients
-    io.emit('allData', {
-      leaderboard,
-      users,
-      appearance,
-      raceEventName,
-      checkpoints,
-      checkpointData,
-      recentActivity
+    
+    // Only send the specific changes, not all data
+    io.emit('checkpointDataUpdated', {
+      type: 'incremental',
+      changes: data,
+      timestamp: Date.now()
     });
+    
+    // Don't send allData every time - this was causing the lag!
+    // io.emit('allData', { ... }); // Removed this!
   });
 
   // Recent activity logs
