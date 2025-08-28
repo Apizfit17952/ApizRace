@@ -11,6 +11,17 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const fs = require('fs');
+const fetch = require('node-fetch'); // Import node-fetch
+
+// External Keep-Alive Script (Free Tier Hack)
+function pingWebApp() {
+  fetch("https://apizrace.onrender.com/")
+    .then(res => console.log(`Pinged ApizRace: ${res.status} ${res.statusText}`)) // Log status for debugging
+    .catch(err => console.error(`Error pinging ApizRace: ${err.message}`)); // Log errors
+}
+
+// Ping every 9 minutes (540000 ms)
+setInterval(pingWebApp, 540000);
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +56,11 @@ const limiter = rateLimit({
 });
 
 app.use('/api/', limiter);
+
+// Add a lightweight ping endpoint
+app.get('/ping', (req, res) => {
+  res.send('OK');
+});
 
 // Load admin config
 const ADMIN_CONFIG_PATH = path.join(__dirname, 'admin.config.json');
